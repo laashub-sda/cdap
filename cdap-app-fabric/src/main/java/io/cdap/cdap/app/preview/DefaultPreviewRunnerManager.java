@@ -24,6 +24,7 @@ import com.google.inject.Guice;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
 import com.google.inject.Provides;
+import com.google.inject.Scopes;
 import com.google.inject.name.Named;
 import com.google.inject.util.Modules;
 import io.cdap.cdap.api.common.Bytes;
@@ -49,7 +50,8 @@ import io.cdap.cdap.data2.metadata.writer.NoOpMetadataServiceClient;
 import io.cdap.cdap.internal.app.preview.PreviewRequestFetcherFactory;
 import io.cdap.cdap.internal.app.preview.PreviewRunnerService;
 import io.cdap.cdap.internal.provision.ProvisionerModule;
-import io.cdap.cdap.logging.guice.LocalLogAppenderModule;
+import io.cdap.cdap.logging.appender.LogAppender;
+import io.cdap.cdap.logging.appender.tms.PreviewTMSLogAppender;
 import io.cdap.cdap.messaging.guice.MessagingServerRuntimeModule;
 import io.cdap.cdap.metadata.MetadataReaderWriterModules;
 import io.cdap.cdap.metrics.guice.MetricsClientRuntimeModule;
@@ -190,8 +192,13 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
       // Use the in-memory module for metrics collection, which metrics still get persisted to dataset, but
       // save threads for reading metrics from TMS, as there won't be metrics in TMS.
       new MetricsClientRuntimeModule().getInMemoryModules(),
-      new LocalLogAppenderModule(),
-      new MessagingServerRuntimeModule().getInMemoryModules(),
+      new AbstractModule() {
+        @Override
+        protected void configure() {
+          bind(LogAppender.class).to(PreviewTMSLogAppender.class).in(Scopes.SINGLETON);
+        }
+      },
+    new MessagingServerRuntimeModule().getInMemoryModules(),
       Modules.override(new MetadataReaderWriterModules().getInMemoryModules()).with(new AbstractModule() {
         @Override
         protected void configure() {
