@@ -30,7 +30,6 @@ import io.cdap.http.HttpResponder;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import org.mortbay.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +60,7 @@ public class PreviewHttpHandlerInternal extends AbstractHttpHandler {
       byte[] pollerInfo = ByteStreams.toByteArray(is);
       Optional<PreviewRequest> previewRequestOptional = previewManager.poll(pollerInfo);
       if (previewRequestOptional.isPresent()) {
+        LOG.info("Received poller info is {}", Bytes.toString(pollerInfo));
         responder.sendString(HttpResponseStatus.OK, GSON.toJson(previewRequestOptional.get()));
       } else {
         responder.sendStatus(HttpResponseStatus.NOT_FOUND);

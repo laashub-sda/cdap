@@ -48,6 +48,7 @@ import io.cdap.cdap.data2.dataset2.lib.table.leveldb.LevelDBTableService;
 import io.cdap.cdap.data2.metadata.writer.MetadataServiceClient;
 import io.cdap.cdap.data2.metadata.writer.NoOpMetadataServiceClient;
 import io.cdap.cdap.internal.app.preview.PreviewRequestFetcherFactory;
+import io.cdap.cdap.internal.app.preview.PreviewRequestPollerInfoProvider;
 import io.cdap.cdap.internal.app.preview.PreviewRunnerService;
 import io.cdap.cdap.internal.provision.ProvisionerModule;
 import io.cdap.cdap.logging.appender.LogAppender;
@@ -67,7 +68,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Map;
-import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -89,6 +90,8 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
   private final LevelDBTableService previewLevelDBTableService;
   private final PreviewRequestFetcherFactory previewRequestFetcherFactory;
   private PreviewRunner runner;
+  private final PreviewRequestPollerInfoProvider pollerInfoProvider;
+  private final PreviewRunnerSystemTerminator previewRunnerSystemTerminator;
 
   @Inject
   DefaultPreviewRunnerManager(
@@ -99,7 +102,9 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
     @Named(DataSetsModules.BASE_DATASET_FRAMEWORK) DatasetFramework datasetFramework,
     TransactionSystemClient transactionSystemClient,
     @Named(PreviewConfigModule.PREVIEW_LEVEL_DB) LevelDBTableService previewLevelDBTableService,
-    PreviewRunnerModule previewRunnerModule, PreviewRequestFetcherFactory previewRequestFetcherFactory) {
+    PreviewRunnerModule previewRunnerModule, PreviewRequestFetcherFactory previewRequestFetcherFactory,
+    PreviewRequestPollerInfoProvider pollerInfoProvider,
+    PreviewRunnerSystemTerminator previewRunnerSystemTerminator) {
     this.previewCConf = previewCConf;
     this.previewHConf = previewHConf;
     this.previewSConf = previewSConf;
@@ -112,7 +117,10 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
     this.previewRunnerModule = previewRunnerModule;
     this.previewLevelDBTableService = previewLevelDBTableService;
     this.previewRequestFetcherFactory = previewRequestFetcherFactory;
+    this.pollerInfoProvider = pollerInfoProvider;
+    this.previewRunnerSystemTerminator = previewRunnerSystemTerminator;
   }
+
 
   @Override
   protected void startUp() throws Exception {
@@ -126,11 +134,19 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
 
     // Create and start the preview poller services.
     for (int i = 0; i < maxConcurrentPreviews; i++) {
-      String pollerInfo = UUID.randomUUID().toString();
+      String pollerInfo = Bytes.toString(pollerInfoProvider.get());
 
+      Callable<Void> callable = () -> {
+        previewPollers.remove(pollerInfo);
+        if (previewPollers.isEmpty()) {
+          // terminate the preview runner system
+          previewRunnerSystemTerminator.terminate();
+        }
+        return null;
+      };
       PreviewRunnerService pollerService = new PreviewRunnerService(
         previewCConf, previewInjector.getInstance(PreviewRunner.class),
-        previewRequestFetcherFactory.create(Bytes.toBytes(pollerInfo)));
+        previewRequestFetcherFactory.create(Bytes.toBytes(pollerInfo)), callable);
 
       pollerService.startAndWait();
       previewPollers.put(pollerInfo, pollerService);
@@ -164,7 +180,7 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
       throw new NotFoundException("Preview run cannot be stopped. Please try stopping again or start new preview run.");
     }
     service.stopAndWait();
-    String newRunnerId = UUID.randomUUID().toString();
+    String newRunnerId = Bytes.toString(pollerInfoProvider.get());
     PreviewRunnerService newService = new PreviewRunnerService(
       previewCConf, runner, previewRequestFetcherFactory.create(Bytes.toBytes(newRunnerId)));
     newService.startAndWait();
