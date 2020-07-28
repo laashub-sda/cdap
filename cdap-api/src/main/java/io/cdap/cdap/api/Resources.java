@@ -16,12 +16,13 @@
 
 package io.cdap.cdap.api;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /**
  * Carries system resources requirements.
  */
-public final class Resources {
+public final class Resources implements Serializable {
 
   private static final int DEFAULT_VIRTUAL_CORES = 1;
   private static final int DEFAULT_MEMORY_MB = 512;

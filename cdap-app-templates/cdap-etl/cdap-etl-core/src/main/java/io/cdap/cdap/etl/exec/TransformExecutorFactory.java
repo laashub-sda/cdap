@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 
 /**
  * Helps create {@link TransformExecutor TransformExecutors}.
@@ -58,7 +59,7 @@ public abstract class TransformExecutorFactory<T> {
   protected final boolean collectStageStatistics;
 
   protected TransformExecutorFactory(PipelinePluginInstantiator pluginInstantiator, MacroEvaluator macroEvaluator,
-                                     Metrics metrics, String sourceStageName,
+                                     Metrics metrics, @Nullable String sourceStageName,
                                      boolean collectStageStatistics) {
     this.pluginInstantiator = pluginInstantiator;
     this.metrics = metrics;

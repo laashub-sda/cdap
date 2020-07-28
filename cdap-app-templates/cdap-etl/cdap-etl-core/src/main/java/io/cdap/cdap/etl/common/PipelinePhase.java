@@ -26,6 +26,7 @@ import io.cdap.cdap.etl.planner.Dag;
 import io.cdap.cdap.etl.proto.v2.spec.PluginSpec;
 import io.cdap.cdap.etl.proto.v2.spec.StageSpec;
 
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,7 +40,7 @@ import javax.annotation.Nullable;
 /**
  * Keeps track of the plugin ids for the source, transforms, and sink of a pipeline phase.
  */
-public class PipelinePhase implements Iterable<StageSpec> {
+public class PipelinePhase implements Iterable<StageSpec>, Serializable {
   // plugin type -> stage info
   private final Map<String, Set<StageSpec>> stagesByType;
   private final Map<String, StageSpec> stagesByName;

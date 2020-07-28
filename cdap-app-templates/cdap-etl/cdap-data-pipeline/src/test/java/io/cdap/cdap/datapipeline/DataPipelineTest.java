@@ -80,6 +80,7 @@ import io.cdap.cdap.etl.mock.batch.IncapableSource;
 import io.cdap.cdap.etl.mock.batch.LookupTransform;
 import io.cdap.cdap.etl.mock.batch.MockExternalSink;
 import io.cdap.cdap.etl.mock.batch.MockExternalSource;
+import io.cdap.cdap.etl.mock.batch.MockFileSink;
 import io.cdap.cdap.etl.mock.batch.MockRuntimeDatasetSink;
 import io.cdap.cdap.etl.mock.batch.MockRuntimeDatasetSource;
 import io.cdap.cdap.etl.mock.batch.MockSink;
@@ -185,6 +186,8 @@ public class DataPipelineTest extends HydratorTestBase {
   private static final String WORDCOUNT_PLUGIN = "wordcount";
   private static final String FILTER_PLUGIN = "filterlines";
   private static final String SPARK_TYPE = io.cdap.cdap.etl.common.Constants.SPARK_PROGRAM_PLUGIN_TYPE;
+  private static final Map<String, String> CONSOLIDATE_STAGE_ARGS =
+    Collections.singletonMap(io.cdap.cdap.etl.common.Constants.CONSOLIDATE_STAGES, "true");
 
   @BeforeClass
   public static void setupTest() throws Exception {
@@ -691,19 +694,20 @@ public class DataPipelineTest extends HydratorTestBase {
 
   @Test
   public void testErrorTransform() throws Exception {
-    testErrorTransform(Engine.MAPREDUCE);
+    //testErrorTransform(Engine.MAPREDUCE);
     testErrorTransform(Engine.SPARK);
   }
 
   private void testErrorTransform(Engine engine) throws Exception {
     String source1TableName = "errTestIn1-" + engine;
     String source2TableName = "errTestIn2-" + engine;
-    String sink1TableName = "errTestOut1-" + engine;
-    String sink2TableName = "errTestOut2-" + engine;
 
     Schema inputSchema = Schema.recordOf("user",
                                          Schema.Field.of("name", Schema.of(Schema.Type.STRING)),
                                          Schema.Field.of("id", Schema.of(Schema.Type.INT)));
+    File baseOutput = TMP_FOLDER.newFolder();
+    File outputDir1 = new File(baseOutput, "output1");
+    File outputDir2 = new File(baseOutput, "output2");
     /*
      *
      * source1 --> filter1 --> filter2 --> agg1 --> agg2
@@ -731,8 +735,8 @@ public class DataPipelineTest extends HydratorTestBase {
       .addStage(new ETLStage("errorflatten", FlattenErrorTransform.getPlugin()))
       .addStage(new ETLStage("errorfilter", FilterErrorTransform.getPlugin(3)))
       .addStage(new ETLStage("dropnull", DropNullTransform.getPlugin("name")))
-      .addStage(new ETLStage("sink1", MockSink.getPlugin(sink1TableName)))
-      .addStage(new ETLStage("sink2", MockSink.getPlugin(sink2TableName)))
+      .addStage(new ETLStage("sink1", MockFileSink.getPlugin(outputDir1.getAbsolutePath())))
+      .addStage(new ETLStage("sink2", MockFileSink.getPlugin(outputDir2.getAbsolutePath())))
       .addConnection("source1", "filter1")
       .addConnection("source2", "dropnull")
       .addConnection("filter1", "filter2")
@@ -790,15 +794,13 @@ public class DataPipelineTest extends HydratorTestBase {
         .set("errMsg", "bad val").set("errCode", 3).set("errStage", "agg2").build(),
       StructuredRecord.builder(flattenSchema).set("name", "April").set("id", 5)
         .set("errMsg", "Field name was not null").set("errCode", 5).set("errStage", "dropnull").build());
-    DataSetManager<Table> sink1Table = getDataset(sink1TableName);
-    Assert.assertEquals(expected, ImmutableSet.copyOf(MockSink.readOutput(sink1Table)));
+    Assert.assertEquals(expected, ImmutableSet.copyOf(MockFileSink.readOutput(outputDir1)));
 
     expected = ImmutableSet.of(
       StructuredRecord.builder(inputSchema).set("name", "Leo").set("id", 1).build(),
       StructuredRecord.builder(inputSchema).set("name", "Ralph").set("id", 2).build(),
       StructuredRecord.builder(inputSchema).set("name", "April").set("id", 5).build());
-    DataSetManager<Table> sink2Table = getDataset(sink2TableName);
-    Assert.assertEquals(expected, ImmutableSet.copyOf(MockSink.readOutput(sink2Table)));
+    Assert.assertEquals(expected, ImmutableSet.copyOf(MockFileSink.readOutput(outputDir2)));
 
     /*
      *

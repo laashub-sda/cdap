@@ -47,6 +47,7 @@ public abstract class BatchSource<KEY_IN, VAL_IN, OUT> extends BatchConfigurable
    *
    * @param context {@link BatchRuntimeContext}
    * @throws Exception if there is any error during initialization
+   * @deprecated use {@link #destroy()}
    */
   @Override
   public void initialize(BatchRuntimeContext context) throws Exception {

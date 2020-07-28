@@ -19,6 +19,7 @@ package io.cdap.cdap.etl.spark.streaming;
 import io.cdap.cdap.api.Transactionals;
 import io.cdap.cdap.api.TxRunnable;
 import io.cdap.cdap.api.data.DatasetContext;
+import io.cdap.cdap.api.dataset.lib.KeyValue;
 import io.cdap.cdap.api.spark.JavaSparkExecutionContext;
 import io.cdap.cdap.etl.api.Alert;
 import io.cdap.cdap.etl.api.batch.SparkCompute;
@@ -49,12 +50,14 @@ import io.cdap.cdap.etl.spark.streaming.function.StreamingSparkSinkFunction;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
+import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.PairFlatMapFunction;
 import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.api.java.JavaDStream;
 import org.apache.spark.streaming.api.java.JavaPairDStream;
 
+import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
@@ -106,6 +109,11 @@ public class DStreamCollection<T> implements SparkCollection<T> {
   public SparkCollection<RecordInfo<Object>> multiOutputTransform(StageSpec stageSpec,
                                                                   StageStatisticsCollector collector) {
     return wrap(stream.transform(new DynamicTransform<T>(new DynamicDriverContext(stageSpec, sec, collector), true)));
+  }
+
+  @Override
+  public <U> SparkCollection<U> map(Function<T, U> function) {
+    return wrap(stream.map(function));
   }
 
   @Override
@@ -166,6 +174,13 @@ public class DStreamCollection<T> implements SparkCollection<T> {
         Compat.foreachRDD(stream.cache(), new StreamingBatchSinkFunction<>(sinkFunction, sec, stageSpec));
       }
     };
+  }
+
+  @Override
+  public Runnable createMultiStoreTask(Set<String> sinkNames,
+                                       PairFlatMapFunction<T, String, KeyValue<Object, Object>> multiSinkFunction) {
+    // TODO: implement
+    return () -> { };
   }
 
   @Override

@@ -17,38 +17,52 @@
 package io.cdap.cdap.etl.spark.batch;
 
 import com.google.common.collect.ImmutableMap;
+import io.cdap.cdap.api.Admin;
+import io.cdap.cdap.api.data.DatasetContext;
 import io.cdap.cdap.api.data.batch.Output;
 import io.cdap.cdap.api.data.batch.OutputFormatProvider;
+import io.cdap.cdap.api.dataset.DatasetManagementException;
+import io.cdap.cdap.api.dataset.lib.KeyValue;
 import io.cdap.cdap.api.spark.JavaSparkExecutionContext;
+import io.cdap.cdap.etl.api.lineage.AccessType;
+import io.cdap.cdap.etl.common.Constants;
+import io.cdap.cdap.etl.common.ExternalDatasets;
+import io.cdap.cdap.etl.common.output.MultiOutputFormat;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.spark.api.java.JavaPairRDD;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Handles writes to batch sinks. Maintains a mapping from sinks to their outputs and handles serialization and
  * deserialization for those mappings.
  */
 public final class SparkBatchSinkFactory {
+  private static final Logger LOG = LoggerFactory.getLogger(SparkBatchSinkFactory.class);
   private final Map<String, OutputFormatProvider> outputFormatProviders;
+  private final Set<String> uncombinableSinks;
   private final Map<String, DatasetInfo> datasetInfos;
   private final Map<String, Set<String>> sinkOutputs;
 
   public SparkBatchSinkFactory() {
     this.outputFormatProviders = new HashMap<>();
+    this.uncombinableSinks = new HashSet<>();
     this.datasetInfos = new HashMap<>();
     this.sinkOutputs = new HashMap<>();
   }
 
   void addOutput(String stageName, Output output) {
     if (output instanceof Output.DatasetOutput) {
-      // Note if output format provider is trackable then it comes in as DatasetOutput
       Output.DatasetOutput datasetOutput = (Output.DatasetOutput) output;
       addOutput(stageName, datasetOutput.getName(), datasetOutput.getAlias(), datasetOutput.getArguments());
+      uncombinableSinks.add(stageName);
     } else if (output instanceof Output.OutputFormatProviderOutput) {
       Output.OutputFormatProviderOutput ofpOutput = (Output.OutputFormatProviderOutput) output;
       addOutput(stageName, ofpOutput.getAlias(),
@@ -57,6 +71,13 @@ public final class SparkBatchSinkFactory {
     } else {
       throw new IllegalArgumentException("Unknown output format type: " + output.getClass().getCanonicalName());
     }
+  }
+
+  /**
+   * @return stages that use CDAP dataset outputs
+   */
+  public Set<String> getUncombinableSinks() {
+    return uncombinableSinks;
   }
 
   private void addOutput(String stageName, String alias,
@@ -76,9 +97,51 @@ public final class SparkBatchSinkFactory {
     addStageOutput(stageName, alias);
   }
 
+  /**
+   * Writes a combined RDD using multiple OutputFormatProviders.
+   * Returns the set of output names that were written, which still require dataset lineage to be recorded.
+   */
+  public <K, V> Set<String> writeCombinedRDD(JavaPairRDD<String, KeyValue<K, V>> combinedRDD,
+                                             JavaSparkExecutionContext sec, Set<String> sinkNames) {
+    Map<String, OutputFormatProvider> outputs = new HashMap<>();
+    Set<String> outputNames = new HashSet<>();
+    for (String sinkName : sinkNames) {
+      Set<String> sinkOutputNames = sinkOutputs.get(sinkName);
+      outputNames.addAll(sinkOutputNames);
+      if (sinkOutputNames == null || sinkOutputNames.isEmpty()) {
+        // should never happen if validation happened correctly at pipeline configure time
+        throw new IllegalStateException(sinkName + " has no outputs. " +
+                                          "Please check that the sink calls addOutput at some point.");
+      }
 
-  public <K, V> void writeFromRDD(JavaPairRDD<K, V> rdd, JavaSparkExecutionContext sec, String sinkName,
-                                  Class<K> keyClass, Class<V> valueClass) {
+      for (String outputName : sinkOutputs.get(sinkName)) {
+        OutputFormatProvider outputFormatProvider = outputFormatProviders.get(outputName);
+        if (outputFormatProvider == null) {
+          // should never happen if planner is implemented correctly and dataset based sinks are not
+          // grouped with other sinks
+          throw new IllegalStateException(
+            String.format("sink '%s' does not use an OutputFormatProvider. " +
+                            "This indicates that there is a planner bug. " +
+                            "Please report the issue and turn off stage consolidation by setting '%s'" +
+                            " to false in the runtime arguments.", sinkName, Constants.CONSOLIDATE_STAGES));
+        }
+        outputs.put(outputName, outputFormatProvider);
+      }
+    }
+
+    Configuration hConf = new Configuration();
+    hConf.clear();
+    MultiOutputFormat.addOutputs(hConf, outputs, sinkOutputs);
+    hConf.set(MRJobConfig.OUTPUT_FORMAT_CLASS_ATTR, MultiOutputFormat.class.getName());
+    combinedRDD.saveAsNewAPIHadoopDataset(hConf);
+    return outputNames;
+  }
+
+  /**
+   * Write the given RDD using one or more OutputFormats or CDAP datasets.
+   * Returns the names of the outputs written using OutputFormatProvider, which need to register lineage.
+   */
+  public <K, V> Set<String> writeFromRDD(JavaPairRDD<K, V> rdd, JavaSparkExecutionContext sec, String sinkName) {
     Set<String> outputNames = sinkOutputs.get(sinkName);
     if (outputNames == null || outputNames.isEmpty()) {
       // should never happen if validation happened correctly at pipeline configure time
@@ -102,6 +165,16 @@ public final class SparkBatchSinkFactory {
       if (datasetInfo != null) {
         sec.saveAsDataset(rdd, datasetInfo.getDatasetName(), datasetInfo.getDatasetArgs());
       }
+    }
+    return outputNames;
+  }
+
+  private void registerLineage(Admin admin, Supplier<DatasetContext> datasetContext, String outputName) {
+    try {
+      ExternalDatasets.registerLineage(admin, outputName, AccessType.WRITE, null,
+                                       () -> datasetContext.get().getDataset(outputName));
+    } catch (DatasetManagementException e) {
+      LOG.warn("Unable to record dataset write lineage for {}", outputName);
     }
   }
 
