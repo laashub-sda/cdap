@@ -53,10 +53,6 @@ public class PreviewRunnerManagerModule extends RuntimeModule {
     return new PrivateModule() {
       @Override
       protected void configure() {
-        bind(PreviewRunnerSystemTerminator.class).toInstance(() -> {
-          // no-op
-        });
-        expose(PreviewRunnerSystemTerminator.class);
         bind(PreviewRequestPollerInfoProvider.class).to(LocalPreviewRequestPollerInfoProvider.class);
         expose(PreviewRequestPollerInfoProvider.class);
         
@@ -89,11 +85,6 @@ public class PreviewRunnerManagerModule extends RuntimeModule {
     return new PrivateModule() {
       @Override
       protected void configure() {
-        bind(PreviewRunnerSystemTerminator.class).toInstance(() -> {
-          // no-op.
-        });
-        expose(PreviewRunnerSystemTerminator.class);
-
         bind(DatasetDefinitionRegistryFactory.class)
           .to(DefaultDatasetDefinitionRegistryFactory.class).in(Scopes.SINGLETON);
 

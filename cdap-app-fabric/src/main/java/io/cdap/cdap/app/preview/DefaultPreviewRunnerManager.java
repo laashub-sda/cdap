@@ -91,7 +91,6 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
   private final PreviewRequestFetcherFactory previewRequestFetcherFactory;
   private PreviewRunner runner;
   private final PreviewRequestPollerInfoProvider pollerInfoProvider;
-  private final PreviewRunnerSystemTerminator previewRunnerSystemTerminator;
 
   @Inject
   DefaultPreviewRunnerManager(
@@ -103,8 +102,7 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
     TransactionSystemClient transactionSystemClient,
     @Named(PreviewConfigModule.PREVIEW_LEVEL_DB) LevelDBTableService previewLevelDBTableService,
     PreviewRunnerModule previewRunnerModule, PreviewRequestFetcherFactory previewRequestFetcherFactory,
-    PreviewRequestPollerInfoProvider pollerInfoProvider,
-    PreviewRunnerSystemTerminator previewRunnerSystemTerminator) {
+    PreviewRequestPollerInfoProvider pollerInfoProvider) {
     this.previewCConf = previewCConf;
     this.previewHConf = previewHConf;
     this.previewSConf = previewSConf;
@@ -118,7 +116,6 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
     this.previewLevelDBTableService = previewLevelDBTableService;
     this.previewRequestFetcherFactory = previewRequestFetcherFactory;
     this.pollerInfoProvider = pollerInfoProvider;
-    this.previewRunnerSystemTerminator = previewRunnerSystemTerminator;
   }
 
 
@@ -140,7 +137,7 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
         previewPollers.remove(pollerInfo);
         if (previewPollers.isEmpty()) {
           // terminate the preview runner system
-          previewRunnerSystemTerminator.terminate();
+          this.shutDown();
         }
         return null;
       };
