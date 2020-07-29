@@ -256,6 +256,101 @@ public class AutoJoinerTest extends HydratorTestBase {
   }
 
   @Test
+  public void testAutoInnerJoinSkewed() throws Exception {
+    Schema expectedSchema = Schema.recordOf("interests.users",
+                                            Schema.Field.of("interests_region", Schema.of(Schema.Type.STRING)),
+                                            Schema.Field.of("interests_user_id", Schema.of(Schema.Type.INT)),
+                                            Schema.Field.of("interests_interest", Schema.of(Schema.Type.STRING)),
+                                            Schema.Field.of("users_region", Schema.of(Schema.Type.STRING)),
+                                            Schema.Field.of("users_user_id", Schema.of(Schema.Type.INT)),
+                                            Schema.Field.of("users_name", Schema.of(Schema.Type.STRING)));
+    Set<StructuredRecord> expected = new HashSet<>();
+    expected.add(StructuredRecord.builder(expectedSchema)
+                   .set("interests_region", "us")
+                   .set("interests_interest", "hiking")
+                   .set("interests_user_id", 0)
+                   .set("users_region", "us")
+                   .set("users_user_id", 0)
+                   .set("users_name", "alice").build());
+
+    expected.add(StructuredRecord.builder(expectedSchema)
+                   .set("interests_region", "us")
+                   .set("interests_interest", "running")
+                   .set("interests_user_id", 0)
+                   .set("users_region", "us")
+                   .set("users_user_id", 0)
+                   .set("users_name", "alice").build());
+
+    expected.add(StructuredRecord.builder(expectedSchema)
+                   .set("interests_region", "us")
+                   .set("interests_interest", "cooking")
+                   .set("interests_user_id", 0)
+                   .set("users_region", "us")
+                   .set("users_user_id", 0)
+                   .set("users_name", "alice").build());
+
+    expected.add(StructuredRecord.builder(expectedSchema)
+                   .set("interests_region", "us")
+                   .set("interests_interest", "hiking")
+                   .set("interests_user_id", 1)
+                   .set("users_region", "us")
+                   .set("users_user_id", 1)
+                   .set("users_name", "bob").build());
+
+    testSimpleAutoJoinSkewed(Arrays.asList("users", "interests"), expected, Engine.SPARK);
+    testSimpleAutoJoinSkewed(Arrays.asList("users", "interests"), expected, Engine.MAPREDUCE);
+  }
+
+  @Test
+  public void testAutoLeftOuterJoinSkewed() throws Exception {
+    Schema expectedSchema = Schema.recordOf("interests.users",
+                                            Schema.Field.of("interests_region", Schema.of(Schema.Type.STRING)),
+                                            Schema.Field.of("interests_user_id", Schema.of(Schema.Type.INT)),
+                                            Schema.Field.of("interests_interest", Schema.of(Schema.Type.STRING)),
+                                            Schema.Field
+                                              .of("users_region", Schema.nullableOf(Schema.of(Schema.Type.STRING))),
+                                            Schema.Field
+                                              .of("users_user_id", Schema.nullableOf(Schema.of(Schema.Type.INT))),
+                                            Schema.Field
+                                              .of("users_name", Schema.nullableOf(Schema.of(Schema.Type.STRING))));
+    Set<StructuredRecord> expected = new HashSet<>();
+    expected.add(StructuredRecord.builder(expectedSchema)
+                   .set("interests_region", "us")
+                   .set("interests_interest", "hiking")
+                   .set("interests_user_id", 0)
+                   .set("users_region", "us")
+                   .set("users_user_id", 0)
+                   .set("users_name", "alice").build());
+
+    expected.add(StructuredRecord.builder(expectedSchema)
+                   .set("interests_region", "us")
+                   .set("interests_interest", "running")
+                   .set("interests_user_id", 0)
+                   .set("users_region", "us")
+                   .set("users_user_id", 0)
+                   .set("users_name", "alice").build());
+
+    expected.add(StructuredRecord.builder(expectedSchema)
+                   .set("interests_region", "us")
+                   .set("interests_interest", "cooking")
+                   .set("interests_user_id", 0)
+                   .set("users_region", "us")
+                   .set("users_user_id", 0)
+                   .set("users_name", "alice").build());
+
+    expected.add(StructuredRecord.builder(expectedSchema)
+                   .set("interests_region", "us")
+                   .set("interests_interest", "hiking")
+                   .set("interests_user_id", 1)
+                   .set("users_region", "us")
+                   .set("users_user_id", 1)
+                   .set("users_name", "bob").build());
+
+    testSimpleAutoJoinSkewed(Collections.singletonList("interests"), expected, Engine.SPARK);
+    testSimpleAutoJoinSkewed(Collections.singletonList("interests"), expected, Engine.MAPREDUCE);
+  }
+
+  @Test
   public void testAutoLeftOuterJoin() throws Exception {
     Schema expectedSchema = Schema.recordOf(
       "purchases.users",
@@ -410,6 +505,80 @@ public class AutoJoinerTest extends HydratorTestBase {
     Assert.assertEquals(expected, new HashSet<>(outputRecords));
 
     validateMetric(5, appId, "join.records.in");
+    validateMetric(expected.size(), appId, "join.records.out");
+    validateMetric(1, appId, "sink." + MockSink.INITIALIZED_COUNT_METRIC);
+  }
+
+  private void testSimpleAutoJoinSkewed(List<String> required,
+                                        Set<StructuredRecord> expected, Engine engine) throws Exception {
+    /*
+         users ------|
+                     |--> join --> sink
+         purchases --|
+
+         joinOn: users.region = purchases.region and users.user_id = purchases.user_id
+     */
+    int skewFactor = 3;
+    String userInput = UUID.randomUUID().toString();
+    String interestInput = UUID.randomUUID().toString();
+    String output = UUID.randomUUID().toString();
+    ETLBatchConfig config = ETLBatchConfig.builder()
+      .addStage(new ETLStage("users", MockSource.getPlugin(userInput, USER_SCHEMA)))
+      .addStage(new ETLStage("interests", MockSource.getPlugin(interestInput, INTEREST_SCHEMA)))
+      .addStage(new ETLStage("join", MockAutoJoiner.getPlugin(Arrays.asList("interests", "users"),
+                                                              Arrays.asList("region", "user_id"),
+                                                              required, Collections.emptyList(), true,
+                                                              new JoinDistribution(skewFactor,
+                                                                                   "interests"))))
+      .addStage(new ETLStage("sink", MockSink.getPlugin(output)))
+      .addConnection("users", "join")
+      .addConnection("interests", "join")
+      .addConnection("join", "sink")
+      .setEngine(engine)
+      .build();
+
+    AppRequest<ETLBatchConfig> appRequest = new AppRequest<>(APP_ARTIFACT, config);
+    ApplicationId appId = NamespaceId.DEFAULT.app(UUID.randomUUID().toString());
+    ApplicationManager appManager = deployApplication(appId, appRequest);
+
+    // write input data
+    List<StructuredRecord> userData = Arrays.asList(USER_ALICE, USER_BOB, USER_JOHN);
+    DataSetManager<Table> inputManager = getDataset(userInput);
+    MockSource.writeInput(inputManager, userData);
+
+    List<StructuredRecord> interestData = new ArrayList<>();
+
+    interestData.add(StructuredRecord.builder(INTEREST_SCHEMA)
+                       .set("region", "us")
+                       .set("interest", "hiking")
+                       .set("user_id", 0).build());
+    interestData.add(StructuredRecord.builder(INTEREST_SCHEMA)
+                       .set("region", "us")
+                       .set("interest", "running")
+                       .set("user_id", 0).build());
+    interestData.add(StructuredRecord.builder(INTEREST_SCHEMA)
+                       .set("region", "us")
+                       .set("interest", "cooking")
+                       .set("user_id", 0).build());
+
+    interestData.add(StructuredRecord.builder(INTEREST_SCHEMA)
+                       .set("region", "us")
+                       .set("interest", "hiking")
+                       .set("user_id", 1).build());
+
+    inputManager = getDataset(interestInput);
+    MockSource.writeInput(inputManager, interestData);
+
+    WorkflowManager workflowManager = appManager.getWorkflowManager(SmartWorkflow.NAME);
+    Map<String, String> args = Collections.singletonMap(MockAutoJoiner.PARTITIONS_ARGUMENT, "1");
+    workflowManager.startAndWaitForRun(args, ProgramRunStatus.COMPLETED, 5, TimeUnit.MINUTES);
+
+    DataSetManager<Table> outputManager = getDataset(output);
+    List<StructuredRecord> outputRecords = MockSink.readOutput(outputManager);
+
+    Assert.assertEquals(expected, new HashSet<>(outputRecords));
+
+    validateMetric(7, appId, "join.records.in");
     validateMetric(expected.size(), appId, "join.records.out");
     validateMetric(1, appId, "sink." + MockSink.INITIALIZED_COUNT_METRIC);
   }
