@@ -191,7 +191,7 @@ var rules = [
 
 var webpackConfig = {
   mode: 'development',
-  devtool: 'eval-source-map',
+  devtool: 'eval-cheap-module-source-map',
   context: __dirname + '/app/cdap',
   entry: {
     cdap: [
@@ -278,8 +278,6 @@ var webpackConfig = {
     }
   }
 };
-
-webpackConfig.devtool = 'eval-cheap-module-source-map';
 
 const v8 = require('v8');
 console.log("Allocated ", v8.getHeapStatistics().total_available_size / 1024 / 1024);
