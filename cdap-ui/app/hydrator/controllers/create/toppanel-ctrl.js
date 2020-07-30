@@ -684,6 +684,10 @@ class HydratorPlusPlusTopPanelCtrl {
         .stopPreview(params, {})
         .$promise
         .then(
+          () => {
+            this.previewLoading = false;
+            this.previewRunning = false;
+          },
           (err) => {
             this.previewLoading = false;
             this.previewRunning = false;
