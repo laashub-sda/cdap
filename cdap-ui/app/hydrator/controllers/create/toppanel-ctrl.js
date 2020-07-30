@@ -750,6 +750,7 @@ class HydratorPlusPlusTopPanelCtrl {
       }
     }, (err) => {
       this.stopTimer();
+      this.updateTimerLabelAndTitle();
       let errorMsg = this.myHelpers.extractErrorMessage(err);
       this.myAlertOnValium.show({
         type: 'danger',
