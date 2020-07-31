@@ -33,6 +33,7 @@ interface IKeyValueDropdownWidgetProps extends IMultiRowWidgetProps {
   'kv-delimiter'?: string;
   dropdownOptions: IDropdownOption[];
   delimiter?: string;
+  showDelimiter?: boolean;
 }
 
 interface IKeyValueDropdownProps extends IMultiRowProps<IKeyValueDropdownWidgetProps> {}
@@ -77,9 +78,9 @@ export default function KeyValueDropdownWidget(props) {
 (KeyValueDropdownWidget as any).getWidgetAttributes = () => {
   return {
     'key-placeholder': { type: 'string', required: false },
-    'value-placeholder': { type: 'string', required: false },
     'kv-delimiter': { type: 'string', required: false },
     delimiter: { type: 'string', required: false },
     dropdownOptions: { type: 'IDropdownOption[]', required: true },
+    showDelimiter: { type: 'boolean', required: false },
   };
 };

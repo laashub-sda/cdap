@@ -150,7 +150,7 @@ const MultipleAttributesInputView = ({
   React.useEffect(() => {
     const initialType = getInitialType();
     setSelectedType(initialType);
-  }, [localWidgetToAttributes.get(widgetID)]);
+  }, []);
 
   /*
    * The input fields can have some pre-populated values.

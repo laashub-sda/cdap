@@ -89,7 +89,7 @@ export default function DLPWidget(props) {
 (DLPWidget as any).propTypes = WIDGET_PROPTYPES;
 (DLPWidget as any).getWidgetAttributes = () => {
   return {
-    // TODO: Need to investigatet 'transforms' more
+    // TODO: Need to investigate 'transforms' more
     // transforms: { type: 'ITransformProp[]', required: true },
     filters: { type: 'FilterOption[]', required: true },
     delimiter: { type: 'string', required: false },

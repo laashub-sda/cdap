@@ -31,6 +31,8 @@ interface IKeyValueWidgetProps {
   'value-placeholder'?: string;
   'kv-delimiter'?: string;
   delimiter?: string;
+  showDelimiter?: boolean;
+  default?: string;
 }
 
 interface IKeyValueProps extends IMultiRowProps<IKeyValueWidgetProps> {
@@ -86,5 +88,6 @@ export default function KeyValueWidget(props) {
     'kv-delimiter': { type: 'string', required: false },
     delimiter: { type: 'string', required: false },
     showDelimiter: { type: 'boolean', required: false },
+    default: { type: 'string', required: false },
   };
 };

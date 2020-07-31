@@ -14,16 +14,17 @@
  * the License.
  */
 
+import withStyles, { StyleRules, WithStyles } from '@material-ui/core/styles/withStyles';
+
 import FormControlLabel from '@material-ui/core/FormControlLabel';
+import { IWidgetProps } from 'components/AbstractWidget';
+import If from 'components/If';
 import Radio from '@material-ui/core/Radio';
 import RadioGroup from '@material-ui/core/RadioGroup';
-import withStyles, { StyleRules, WithStyles } from '@material-ui/core/styles/withStyles';
-import classnames from 'classnames';
-import { IWidgetProps } from 'components/AbstractWidget';
-import { WIDGET_PROPTYPES } from 'components/AbstractWidget/constants';
-import If from 'components/If';
-import ThemeWrapper from 'components/ThemeWrapper';
 import React from 'react';
+import ThemeWrapper from 'components/ThemeWrapper';
+import { WIDGET_PROPTYPES } from 'components/AbstractWidget/constants';
+import classnames from 'classnames';
 import { objectQuery } from 'services/helpers';
 
 export const styles = (theme): StyleRules => {
@@ -49,6 +50,7 @@ interface IOption {
 interface IRadioGroupWidgetProps {
   layout: string;
   options: IOption[];
+  default?: string;
 }
 
 interface IRadioGroupProps

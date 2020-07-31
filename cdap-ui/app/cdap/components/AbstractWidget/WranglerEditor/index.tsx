@@ -1,16 +1,3 @@
-import * as React from 'react';
-
-import { Modal, ModalBody } from 'reactstrap';
-import { WithStyles, withStyles } from '@material-ui/styles';
-import { objectQuery, preventPropagation } from 'services/helpers';
-
-import Button from '@material-ui/core/Button';
-import CodeEditor from 'components/CodeEditor';
-import DataPrepHome from 'components/DataPrepHome';
-import { IWidgetProps } from 'components/AbstractWidget';
-import IconSVG from 'components/IconSVG';
-import If from 'components/If';
-import LoadingSVG from 'components/LoadingSVG';
 /*
  * Copyright © 2019 Cask Data, Inc.
  *
@@ -26,9 +13,23 @@ import LoadingSVG from 'components/LoadingSVG';
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+import * as React from 'react';
+
+import { Modal, ModalBody } from 'reactstrap';
+import { WithStyles, withStyles } from '@material-ui/styles';
+import { objectQuery, preventPropagation } from 'services/helpers';
+
+import Button from '@material-ui/core/Button';
+import CodeEditor from 'components/CodeEditor';
+import DataPrepHome from 'components/DataPrepHome';
+import { IWidgetProps } from 'components/AbstractWidget';
+import IconSVG from 'components/IconSVG';
+import If from 'components/If';
+import LoadingSVG from 'components/LoadingSVG';
 import PropTypes from 'prop-types';
 import ThemeWrapper from 'components/ThemeWrapper';
 import ee from 'event-emitter';
+
 // This artifact will stay until we migrate dataprep to use css-in-js
 require('./wrangler-modal.scss');
 

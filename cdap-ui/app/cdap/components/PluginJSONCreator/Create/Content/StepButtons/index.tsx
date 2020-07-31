@@ -89,7 +89,7 @@ const StepButtonsView: React.FC<IStepButtonProps> = ({
           Previous
         </Button>
       </If>
-      <If condition={typeof onComplete !== 'function'}>
+      <If condition={typeof onComplete !== 'function' && activeStep < STEPS.length - 1}>
         <Button
           variant="contained"
           color="primary"

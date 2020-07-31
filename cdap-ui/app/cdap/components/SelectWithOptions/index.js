@@ -1,4 +1,3 @@
-import { Input } from 'reactstrap';
 /*
  * Copyright © 2016 Cask Data, Inc.
  *
@@ -14,6 +13,8 @@ import { Input } from 'reactstrap';
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+
+import { Input } from 'reactstrap';
 import PropTypes from 'prop-types';
 import React from 'react';
 

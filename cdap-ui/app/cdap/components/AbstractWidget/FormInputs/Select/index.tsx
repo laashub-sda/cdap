@@ -76,6 +76,8 @@ interface ISelectWidgetProps extends SelectProps {
   options: ISelectOptions[] | string[] | number[];
   dense?: boolean;
   inline?: boolean;
+  native?: boolean;
+  default?: string;
 }
 
 interface ISelectProps extends IWidgetProps<ISelectWidgetProps> {
@@ -167,6 +169,7 @@ const CustomSelect: React.FC<ISelectProps> = ({
     default: { type: 'string', required: false },
     dense: { type: 'boolean', required: false },
     inline: { type: 'boolean', required: false },
+    native: { type: 'boolean', required: false },
   };
 };
 

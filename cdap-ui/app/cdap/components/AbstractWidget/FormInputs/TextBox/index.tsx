@@ -22,6 +22,7 @@ import { objectQuery } from 'services/helpers';
 
 interface ITextBoxWidgetProps {
   placeholder?: string;
+  default?: string;
 }
 
 interface ITextBoxProps extends IWidgetProps<ITextBoxWidgetProps> {
