@@ -690,7 +690,7 @@ class HydratorPlusPlusTopPanelCtrl {
           },
           (err) => {
             this.previewLoading = false;
-            this.previewRunning = false;
+            this.previewRunning = true;
             this.myAlertOnValium.show({type: 'danger', content: err.data});
         });
   }
