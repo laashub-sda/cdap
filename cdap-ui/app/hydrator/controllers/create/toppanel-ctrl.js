@@ -678,15 +678,27 @@ class HydratorPlusPlusTopPanelCtrl {
     };
     this.previewLoading = true;
     this.loadingLabel = 'Stopping';
-    this.stopTimer();
-    this.updateTimerLabelAndTitle();
     this.myPipelineApi
         .stopPreview(params, {})
         .$promise
         .then(
           () => {
+            this.stopTimer();
+            this.updateTimerLabelAndTitle();
             this.previewLoading = false;
             this.previewRunning = false;
+            this.dataSrc.stopPoll(this.pollId);
+            this.pollId = null;
+
+            let pipelinePreviewPlaceholder = 'The preview of the pipeline';
+            let pipelineName = this.HydratorPlusPlusConfigStore.getName();
+            if (pipelineName.length > 0) {
+              pipelinePreviewPlaceholder += ` "${pipelineName}"`;
+            }
+            this.myAlertOnValium.show({
+              type: 'success',
+              content: `${pipelinePreviewPlaceholder} was stopped.`
+            });
           },
           (err) => {
             this.previewLoading = false;
@@ -702,6 +714,7 @@ class HydratorPlusPlusTopPanelCtrl {
       _cdapNsPath: '/previews/' + previewId + '/status',
       interval: 1000
     }, (res) => {
+      this.pollId = res.__pollId__;
       if (this.previewStore) {
         this.previewStore.dispatch({
           type: this.PREVIEWSTORE_ACTIONS.SET_PREVIEW_STATUS,
@@ -726,6 +739,7 @@ class HydratorPlusPlusTopPanelCtrl {
         this.stopTimer();
         this.previewRunning = false;
         this.dataSrc.stopPoll(res.__pollId__);
+        this.pollId = null;
         let pipelinePreviewPlaceholder = 'The preview of the pipeline';
         let pipelineName = this.HydratorPlusPlusConfigStore.getName();
         if (pipelineName.length > 0) {
@@ -735,11 +749,6 @@ class HydratorPlusPlusTopPanelCtrl {
           this.myAlertOnValium.show({
             type: 'success',
             content: `${pipelinePreviewPlaceholder} has completed successfully.`
-          });
-        } else if (res.status === KILLED) {
-          this.myAlertOnValium.show({
-            type: 'success',
-            content: `${pipelinePreviewPlaceholder} was stopped.`
           });
         } else if (res.status === DEPLOY_FAILED || res.status === RUN_FAILED) {
           this.myAlertOnValium.show({
@@ -758,6 +767,7 @@ class HydratorPlusPlusTopPanelCtrl {
       });
       this.previewRunning = false;
       this.dataSrc.stopPoll(poll.__pollId__);
+      this.pollId = null;
     });
   }
 
