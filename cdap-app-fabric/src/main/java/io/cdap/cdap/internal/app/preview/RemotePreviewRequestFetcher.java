@@ -46,21 +46,15 @@ public class RemotePreviewRequestFetcher implements PreviewRequestFetcher {
     this.pollerInfo = pollerInfo;
   }
 
-
   @Override
   public Optional<PreviewRequest> fetch() throws IOException {
-    HttpRequest.Builder builder = remoteClientInternal.requestBuilder(HttpMethod.POST, "poll");
+    HttpRequest.Builder builder = remoteClientInternal.requestBuilder(HttpMethod.POST, "requests/pull");
     builder.withBody(ByteBuffer.wrap(pollerInfo));
     HttpResponse httpResponse = remoteClientInternal.execute(builder.build());
     if (httpResponse.getResponseCode() == 200) {
       PreviewRequest previewRequest = GSON.fromJson(httpResponse.getResponseBodyAsString(), PreviewRequest.class);
-      return Optional.of(previewRequest);
+      return Optional.ofNullable(previewRequest);
     }
-
-    if (httpResponse.getResponseCode() == 404) {
-      return Optional.empty();
-    }
-
     throw new IOException(String.format("Received status code:%s and body: %s", httpResponse.getResponseCode(),
                                         httpResponse.getResponseBodyAsString(Charsets.UTF_8)));
   }

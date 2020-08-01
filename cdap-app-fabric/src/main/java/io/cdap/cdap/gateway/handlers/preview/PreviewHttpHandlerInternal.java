@@ -16,7 +16,6 @@
 
 package io.cdap.cdap.gateway.handlers.preview;
 
-import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -27,13 +26,11 @@ import io.cdap.cdap.common.conf.Constants;
 import io.cdap.http.AbstractHttpHandler;
 import io.cdap.http.HttpHandler;
 import io.cdap.http.HttpResponder;
-import io.netty.buffer.ByteBufInputStream;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.InputStream;
 import java.util.Optional;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -54,17 +51,15 @@ public class PreviewHttpHandlerInternal extends AbstractHttpHandler {
   }
 
   @POST
-  @Path("/poll")
+  @Path("/requests/pull")
   public void poll(FullHttpRequest request, HttpResponder responder) throws Exception {
-    try (InputStream is = new ByteBufInputStream(request.content())) {
-      byte[] pollerInfo = ByteStreams.toByteArray(is);
-      Optional<PreviewRequest> previewRequestOptional = previewManager.poll(pollerInfo);
-      if (previewRequestOptional.isPresent()) {
-        LOG.info("Received poller info is {}", Bytes.toString(pollerInfo));
-        responder.sendString(HttpResponseStatus.OK, GSON.toJson(previewRequestOptional.get()));
-      } else {
-        responder.sendStatus(HttpResponseStatus.NOT_FOUND);
-      }
+    byte[] pollerInfo = Bytes.toBytes(request.content().nioBuffer());
+    Optional<PreviewRequest> previewRequestOptional = previewManager.poll(pollerInfo);
+    if (previewRequestOptional.isPresent()) {
+      LOG.info("Received poller info is {}", Bytes.toString(pollerInfo));
+      responder.sendString(HttpResponseStatus.OK, GSON.toJson(previewRequestOptional.get()));
+    } else {
+      responder.sendStatus(HttpResponseStatus.OK);
     }
   }
 }

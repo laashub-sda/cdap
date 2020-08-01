@@ -123,7 +123,6 @@ public class PreviewServiceMainTest extends MasterServiceMainTestBase {
     deleteArtfiact(artifactName, artifactVersion);
   }
 
-  @Test
   public void testPreviewAppWithPlugin() throws Exception {
     // Build the app
     LocationFactory locationFactory = new LocalLocationFactory(TEMP_FOLDER.newFolder());

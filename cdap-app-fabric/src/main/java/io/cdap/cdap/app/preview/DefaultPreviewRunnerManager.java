@@ -60,7 +60,9 @@ import io.cdap.cdap.security.auth.context.AuthenticationContextModules;
 import io.cdap.cdap.security.guice.preview.PreviewSecureStoreModule;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tephra.TransactionSystemClient;
+import org.apache.twill.common.Threads;
 import org.apache.twill.discovery.DiscoveryService;
+import org.apache.twill.internal.ServiceListenerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +70,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -122,7 +123,6 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
   @Override
   protected void startUp() throws Exception {
     Injector previewInjector = createPreviewInjector();
-
     // Starts common services
     runner = previewInjector.getInstance(PreviewRunner.class);
     if (runner instanceof Service) {
@@ -133,17 +133,24 @@ public class DefaultPreviewRunnerManager extends AbstractIdleService implements 
     for (int i = 0; i < maxConcurrentPreviews; i++) {
       String pollerInfo = Bytes.toString(pollerInfoProvider.get());
 
-      Callable<Void> callable = () -> {
-        previewPollers.remove(pollerInfo);
-        if (previewPollers.isEmpty()) {
-          // terminate the preview runner system
-          this.shutDown();
-        }
-        return null;
-      };
       PreviewRunnerService pollerService = new PreviewRunnerService(
         previewCConf, previewInjector.getInstance(PreviewRunner.class),
-        previewRequestFetcherFactory.create(Bytes.toBytes(pollerInfo)), callable);
+        previewRequestFetcherFactory.create(Bytes.toBytes(pollerInfo)));
+
+      pollerService.addListener(new ServiceListenerAdapter() {
+        @Override
+        public void terminated(State from) {
+          previewPollers.remove(pollerInfo);
+          if (previewPollers.isEmpty()) {
+            try {
+              shutDown();
+            } catch (Exception e) {
+              // should not happen
+              LOG.error("Failed to shutdown the preview runner manager service.", e);
+            }
+          }
+        }
+      }, Threads.SAME_THREAD_EXECUTOR);
 
       pollerService.startAndWait();
       previewPollers.put(pollerInfo, pollerService);
